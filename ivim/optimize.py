@@ -76,7 +76,13 @@ def crlb(D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], regime: str,
                 J = sIVIM_jacobian(b, D, f, S0 = S0, K = K)
             else:
                 J = sIVIM_jacobian(b, D, f, S0 = S0)
-        Finv = np.linalg.inv((a[np.newaxis,np.newaxis,:]*J.transpose(0,2,1))@J)
+        F = (a[np.newaxis,np.newaxis,:]*J.transpose(0,2,1))@J
+        try:
+            Finv = np.linalg.inv(F)
+        except:
+            print('Unable to compute inv(F)')
+            return np.inf
+                 
         C = np.sum(np.sqrt(Finv[:, 0, 0])/D + np.sqrt(Finv[:, 1, 1])/f)
         if regime == DIFFUSIVE_REGIME:
             C += np.sum(np.sqrt(Finv[:, 2, 2])/Dstar)
@@ -110,9 +116,13 @@ def crlb(D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], regime: str,
                 if fitK:
                     def fn(x, D, f, Dstar, S0, K):    
                         return diffusive(x, D, f, Dstar, S0, K).squeeze()
+                    def jac(x, D, f, Dstar, S0, K):
+                        return diffusive_jacobian(x,D,f,Dstar,S0,K).squeeze()
                 else:
                     def fn(x, D, f, Dstar, S0):    
                         return diffusive(x, D, f, Dstar, S0).squeeze()
+                    def jac(x, D, f, Dstar, S0):
+                        return diffusive_jacobian(x,D,f,Dstar,S0).squeeze()
             elif regime == BALLISTIC_REGIME:
                 p0 = np.insert(p0, 2, 2)
                 bounds = np.insert(bounds, 2, np.array([0, 5]), axis = 1)
@@ -122,25 +132,38 @@ def crlb(D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], regime: str,
                         b = x[:, 0]
                         c = x[:, 1]    
                         return ballistic(b, c, D, f, vd, S0, K).squeeze()
+                    def jac(x, D, f, vd, S0, K):
+                        b = x[:, 0]
+                        c = x[:, 1] 
+                        return ballistic_jacobian(b,c,D,f,vd,S0,K).squeeze()
                 else:
                     def fn(x, D, f, vd, S0):    
-                        b = x
+                        b = x[:,0]
+                        c = x[:,1]
                         return ballistic(b, c, D, f, vd, S0).squeeze()
+                    def jac(x, D, f, vd, S0):
+                        b = x[:, 0]
+                        c = x[:, 1] 
+                        return ballistic_jacobian(b,c,D,f,vd,S0).squeeze()
             else: # NO_REGIME
                 x = b
                 if fitK:
                     def fn(x, D, f, S0, K):    
                         return sIVIM(x, D, f, S0, K).squeeze()
+                    def jac(x, D, f, S0, K):
+                        return sIVIM_jacobian(x, D, f, S0, K).squeeze()
                 else:
                     def fn(x, D, f, S0):    
                         return sIVIM(x, D, f, S0).squeeze()
+                    def jac(x, D, f, S0):
+                        return sIVIM_jacobian(x, D, f, S0).squeeze()
             if fitK:
                 p0 = np.append(p0, 1)
                 bounds = np.append(bounds, np.array([0, 5])[:, np.newaxis], axis = 1)
             P = np.full((Y.shape[0], p0.size), np.nan)
             for i, y in enumerate(Y):
                 try:
-                    P[i, :],_ = curve_fit(fn, x, y, p0=p0, bounds=bounds)
+                    P[i, :],_ = curve_fit(fn, x, y, p0=p0, bounds=bounds,jac=jac)
                 except:
                     P[i, :] = 1e5
             C += np.sum(np.abs(D - P[:, 0])/D + np.abs(f - P[:, 1])/f) * SNR
