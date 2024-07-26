@@ -120,7 +120,7 @@ def read_im(filename: str | None) -> (npt.NDArray[np.float64] | None):
 
 def read_bval(filename: str) -> npt.NDArray[np.float64]:
     """
-    Load c-values from file in format similar to FSL bval format.
+    Load b-values from file in format similar to FSL bval format.
 
     Arguments:
         filename: path to cval file

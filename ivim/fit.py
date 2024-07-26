@@ -3,7 +3,7 @@
 import numpy as np
 import numpy.typing as npt
 from scipy.optimize import curve_fit
-from ivim.models import sIVIM, diffusive, ballistic, intermediate, NO_REGIME, DIFFUSIVE_REGIME, BALLISTIC_REGIME, INTERMEDIATE_REGIME, check_regime
+from ivim.models import sIVIM, diffusive, ballistic, intermediate, sBallistic, sIVIM_jacobian, diffusive_jacobian, ballistic_jacobian, sBallistic_jacobian, NO_REGIME, DIFFUSIVE_REGIME, BALLISTIC_REGIME, INTERMEDIATE_REGIME, SBALLISTIC_REGIME, check_regime
 from ivim.models import monoexp as monoexp_model
 from ivim.models import kurtosis as kurtosis_model
 from ivim.constants import Db
@@ -28,7 +28,10 @@ def nlls(im_file: str, bval_file: str, regime: str, roi_file: str | None = None,
 
     check_regime(regime)
 
-    if regime == BALLISTIC_REGIME:
+    if regime == INTERMEDIATE_REGIME: # No support for intermediate regime
+        raise ValueError(f'Invalid regime "{regime}". Valid regimes are "{NO_REGIME}", "{DIFFUSIVE_REGIME}", "{BALLISTIC_REGIME}" and "{SBALLISTIC_REGIME}".')
+
+    if regime == BALLISTIC_REGIME or regime == SBALLISTIC_REGIME:
         Y, b, c = data_from_file(im_file, bval_file, cval_file=cval_file, roi_file=roi_file)
     else:
         Y, b = data_from_file(im_file, bval_file, roi_file = roi_file)
@@ -38,32 +41,71 @@ def nlls(im_file: str, bval_file: str, regime: str, roi_file: str | None = None,
             def fn(X, D, f, Dstar, S0, K):
                 b = X
                 return diffusive(b, D, f, Dstar, S0, K).squeeze()
+            def jc(X, D, f, Dstar, S0, K):
+                b = X
+                return diffusive_jacobian(b, D, f, Dstar, S0, K).squeeze()
         else:
             def fn(X, D, f, Dstar, S0):
                 b = X
                 return diffusive(b, D, f, Dstar, S0).squeeze()
+            def jc(X, D, f, Dstar, S0,):
+                b = X
+                return diffusive_jacobian(b, D, f, Dstar, S0).squeeze()
     elif regime == BALLISTIC_REGIME:
         if fitK:
             def fn(X, D, f, vd, S0, K):
                 b = X[:, 0]
                 c = X[:, 1]
                 return ballistic(b, c, D, f, vd, S0, K).squeeze()
+            def jc(X, D, f, vd, S0, K):
+                b = X[:, 0]
+                c = X[:, 1]
+                return ballistic_jacobian(b, c, D, f, vd, S0, K).squeeze()
         else:
             def fn(X, D, f, vd, S0):
                 b = X[:, 0]
                 c = X[:, 1]
                 return ballistic(b, c, D, f, vd, S0).squeeze()
-    else:
+            def jc(X, D, f, vd, S0):
+                b = X[:, 0]
+                c = X[:, 1]
+                return ballistic_jacobian(b, c, D, f, vd, S0).squeeze()
+    elif regime == SBALLISTIC_REGIME:
+        if fitK:
+            def fn(X, D, f, S0, K):
+                b = X[:, 0]
+                c = X[:, 1]
+                return sBallistic(b, c, D, f, S0, K).squeeze()
+            def jc(X, D, f, S0, K):
+                b = X[:, 0]
+                c = X[:, 1]
+                return sBallistic_jacobian(b, c, D, f, S0, K).squeeze()
+        else:
+            def fn(X, D, f, S0):
+                b = X[:, 0]
+                c = X[:, 1]
+                return sBallistic(b, c, D, f, S0).squeeze()
+            def jc(X, D, f, S0):
+                b = X[:, 0]
+                c = X[:, 1]
+                return sBallistic_jacobian(b, c, D, f, S0).squeeze()
+    elif regime == NO_REGIME:
         if fitK:
             def fn(X, D, f, S0, K):    
                 b = X
                 return sIVIM(b, D, f, S0, K).squeeze()
+            def jc(X, D, f, S0, K):    
+                b = X
+                return sIVIM_jacobian(b, D, f, S0, K).squeeze()
         else:
             def fn(X, D, f, S0):    
                 b = X
                 return sIVIM(b, D, f, S0).squeeze()
+            def jc(X, D, f, S0):    
+                b = X
+                return sIVIM_jacobian(b, D, f, S0).squeeze()
 
-    if regime == BALLISTIC_REGIME:
+    if regime == BALLISTIC_REGIME or regime == SBALLISTIC_REGIME:
         X = np.stack((b, c), axis=1)
     else:
         X = b
@@ -76,7 +118,7 @@ def nlls(im_file: str, bval_file: str, regime: str, roi_file: str | None = None,
         bounds = np.array([[0, 0, 0], [3e-3, 1, 2*p0[2]]]) # fitting bounds
         if regime == DIFFUSIVE_REGIME:
             p0.insert(2, 10e-3)
-            bounds = np.insert(bounds, 2, [0, 1], axis = 1)
+            bounds = np.insert(bounds, 2, [3e-3, 1], axis = 1)
         if regime == BALLISTIC_REGIME:
             p0.insert(2, 2.0)
             bounds = np.insert(bounds, 2, [0, 5], axis = 1)
@@ -92,7 +134,7 @@ def nlls(im_file: str, bval_file: str, regime: str, roi_file: str | None = None,
 
         if mask[i]:
             try:
-                P[i, :],_ = curve_fit(fn, X, y, p0=p0, bounds=bounds, x_scale=p0)
+                P[i, :],_ = curve_fit(fn, X, y, p0=p0, bounds=bounds, x_scale=p0, jac=jc)
             except:
                 P[i, :] = np.full(npars, np.nan)
     

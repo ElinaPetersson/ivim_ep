@@ -1,12 +1,12 @@
 """Functions for generating noisy image data based on IVIM parameter maps."""
 
 import numpy as np
-from ivim.models import sIVIM, diffusive, ballistic, intermediate, check_regime, DIFFUSIVE_REGIME, BALLISTIC_REGIME, INTERMEDIATE_REGIME
+from ivim.models import sIVIM, diffusive, ballistic, intermediate,sBallistic, check_regime, DIFFUSIVE_REGIME, BALLISTIC_REGIME, INTERMEDIATE_REGIME, SBALLISTIC_REGIME
 from ivim.io.base import write_im, read_im, read_bval, read_cval, write_bval, write_cval, read_time, read_k, write_time, write_k
 from ivim.seq.sde import MONOPOLAR, BIPOLAR
 
 def noise(D_file: str, f_file: str, regime: str, bval_file: str, 
-          noise_sigma: float, outbase: str, S0_file: str | None = None, 
+          noise_sigma: float, outbase: str, n_noise = 1, S0_file: str | None = None, 
           K_file: str | None = None, Dstar_file: str | None = None, 
           vd_file: str | None = None, cval_file: str | None = None,
           tau_file: str | None = None, v_file: str | None = None,
@@ -22,6 +22,7 @@ def noise(D_file: str, f_file: str, regime: str, bval_file: str,
         bval_file:   path to .bval file
         noise_sigma: standard deviation of the noise at b = 0
         outbase:     string used to set the file path to out, e.g. '/folder/out' gives '/folder/out.nii.gz' etc.
+        n_noise:     (optional) number of noise realizations
         S0_file:     (optional) path to nifti file with signal at b = 0, if None S0 = 1
         K_file:      (optional) path to nifti file with kurtosis coefficients
     ---- diffusive regime ----
@@ -67,7 +68,7 @@ def noise(D_file: str, f_file: str, regime: str, bval_file: str,
         K = read_im(K_file)
     
     b = read_bval(bval_file)
-    if regime == BALLISTIC_REGIME:
+    if regime == BALLISTIC_REGIME or regime == SBALLISTIC_REGIME:
         c = read_cval(cval_file)
     if regime == INTERMEDIATE_REGIME:
         delta = read_time(delta_file) # specific read functions would be nicer
@@ -89,25 +90,30 @@ def noise(D_file: str, f_file: str, regime: str, bval_file: str,
             Y = intermediate(b, delta, Delta, D, f, v, tau, S0, K, seq)
         else:
             raise ValueError(f'Invalid pulse sequence "{seq}".')
+    elif regime == SBALLISTIC_REGIME:
+        Y = sBallistic(b, c, D, f, S0, K)
     else:
         Y = sIVIM(b, D, f, S0, K)
 
     if Y.ndim > 4:
         raise ValueError('No support for 5D data and above.')
+    elif Y.ndim == 4:
+        Y = np.reshape(Y,(1,1,Y.shape[0]*Y.shape[1]*Y.shape[2],Y.shape[3]))
     elif Y.ndim == 3:
-        Y = Y[..., np.newaxis]
+        Y = Y[np.newaxis, ...]
     elif Y.ndim == 2:
-        Y = Y[..., np.newaxis, np.newaxis]
+        Y = Y[ np.newaxis, np.newaxis, ...]
     elif Y.ndim == 1:
-        Y = Y[:, np.newaxis, np.newaxis, np.newaxis]
-    sz = np.array(Y.shape)
-    n1 = noise_sigma * np.random.randn(sz[0], sz[1], sz[2], sz[3])
-    n2 = noise_sigma * np.random.randn(sz[0], sz[1], sz[2], sz[3])
+        Y = Y[np.newaxis, np.newaxis, np.newaxis, :]
+
+    rng = np.random.default_rng()
+    n1 = rng.normal(0,noise_sigma,(n_noise,)+Y.shape[1:])
+    n2 = rng.normal(0,noise_sigma,(n_noise,)+Y.shape[1:])
     Ynoise = np.sqrt((Y+n1)**2 + n2**2)
 
     write_im(outbase + '.nii.gz', Ynoise, imref_file = D_file)
     write_bval(outbase + '.bval',b)
-    if regime == BALLISTIC_REGIME:
+    if regime == BALLISTIC_REGIME or regime == SBALLISTIC_REGIME:
         write_cval(outbase + '.cval', c)
     if regime == INTERMEDIATE_REGIME:
         write_time(outbase + '.delta', delta)

@@ -9,6 +9,7 @@ NO_REGIME = 'no'
 DIFFUSIVE_REGIME = 'diffusive'
 BALLISTIC_REGIME = 'ballistic'
 INTERMEDIATE_REGIME = 'intermediate'
+SBALLISTIC_REGIME = 'sballistic'
 
 def monoexp(b: npt.NDArray[np.float64], D: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """
@@ -146,6 +147,24 @@ def intermediate(b: npt.NDArray[np.float64], delta: npt.NDArray[np.float64], Del
     Fp = np.exp(-y**2*(v**2/3)[..., np.newaxis]*Gm**2*(t1+t3+t4))
     return S0[..., np.newaxis] * ((1-f[..., np.newaxis])*kurtosis(b, D, K) + f[..., np.newaxis]*monoexp(b, Db)*Fp)
 
+def sBallistic(b: npt.NDArray[np.float64], c: npt.NDArray[np.float64], D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], S0: npt.NDArray[np.float64] = 1, K: npt.NDArray[np.float64] = 0) -> npt.NDArray[np.float64]:
+    """
+    Return MR signal based on the simplified ballistic IVIM model.
+    
+    Arguments: 
+        b:  vector of b-values [s/mm2]
+        c:  vector of c-values [s/mm]
+        D:  ND array of diffusion coefficients [mm2/s]
+        f:  ND array of perfusion fractions (same shape as D or scalar)
+        S0: (optional) ND array of signal values at b == 0 (same shape as D or scalar)
+        K:  (optional) ND array of kurtosis coefficients (same shape as D or scalar)
+
+    Output:
+        S:  (N+1)D array of signal values
+    """
+
+    [b, c, D, f, S0] = at_least_1d([b, c, D, f, S0])
+    return S0[..., np.newaxis] * ((1-f[..., np.newaxis])*kurtosis(b, D, K)+ np.reshape(np.outer(f, c==0), list(f.shape) + [b.size])*monoexp(b, Db))
 
 def monoexp_jacobian(b: npt.NDArray[np.float64], D: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """ 
@@ -237,6 +256,55 @@ def sIVIM_jacobian(b: npt.NDArray[np.float64], D: npt.NDArray[np.float64], f: np
     
     return J
 
+def diffusive_jacobian(b: npt.NDArray[np.float64], D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], Dstar: npt.NDArray[np.float64], S0: npt.NDArray[np.float64] | None = None, K: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
+    """
+    Return the Jacobian matrix for the diffusive IVIM model.
+    
+    S(b) = S0((1-f)*exp(-b*D+b^2*D^2*K/6)+f*exp(-b*D*))
+
+    Arguments: 
+        b:     vector of b-values [s/mm2]
+        D:     ND array of diffusion coefficients [mm2/s]
+        f:     ND array of perfusion fractions (same shape as D or scalar)
+        Dstar: ND array of perfusion fractions (same shape as D or scalar)
+        S0:    (optional) ND array of signal values at b == 0 (same shape as D or scalar)
+        K:     (optional) ND array of kurtosis coefficients (same shape as D or scalar)
+
+    Output:
+        J:     Jacobian matrix
+    """
+
+    [b, D, f, Dstar] = at_least_1d([b, D, f, Dstar])
+    if S0 is not None:
+        [S0] = at_least_1d([S0])
+
+    J_sIVIM = sIVIM_jacobian(b,D,f,S0,K)
+    dSdD  = J_sIVIM[..., 0]
+    dSdDstar = f[..., np.newaxis] * monoexp(b,Dstar) * -(np.ones_like(f)[..., np.newaxis]@b[np.newaxis, :])
+    if S0 is None:
+        dSdf  = J_sIVIM[..., 1] - np.ones_like(f)[..., np.newaxis]@(b==0)[np.newaxis, :] + monoexp(b,Dstar)
+    else:
+        dSdf  = J_sIVIM[..., 1] - S0[..., np.newaxis]@(b==0)[np.newaxis, :] + S0[..., np.newaxis]*monoexp(b,Dstar)
+        dSdDstar *= S0[..., np.newaxis]
+
+    if S0 is None:
+        if K is None:
+            J_list = [dSdD, dSdf, dSdDstar]
+        else:
+            J_list = [dSdD, dSdf, dSdDstar, J_sIVIM[..., 2]]
+    else:
+        [S0] = at_least_1d([S0])
+        if K is None:
+            dSdS0 = diffusive(b,D,f,Dstar)
+            J_list = [dSdD, dSdf, dSdDstar, dSdS0]
+        else:
+            dSdS0 = diffusive(b,D,f,Dstar,K=K)
+            J_list = [dSdD, dSdf, dSdDstar, dSdS0, J_sIVIM[..., 3]]
+
+    J = np.stack(J_list, axis=-1)
+
+    return J
+
 def ballistic_jacobian(b:  npt.NDArray[np.float64], c: npt.NDArray[np.float64], D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], vd: npt.NDArray[np.float64], S0: npt.NDArray[np.float64] | None = None, K: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
     """
     Return the Jacobian matrix for the ballistic IVIM model.
@@ -287,50 +355,54 @@ def ballistic_jacobian(b:  npt.NDArray[np.float64], c: npt.NDArray[np.float64], 
 
     return J
 
-def diffusive_jacobian(b: npt.NDArray[np.float64], D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], Dstar: npt.NDArray[np.float64], S0: npt.NDArray[np.float64] | None = None, K: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
+def sBallistic_jacobian(b:  npt.NDArray[np.float64], c: npt.NDArray[np.float64], D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], S0: npt.NDArray[np.float64] | None = None, K: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
     """
-    Return the Jacobian matrix for the diffusive IVIM model.
+    Return the Jacobian matrix for the simplified ballistic IVIM model.
     
-    S(b) = S0((1-f)*exp(-b*D+b^2*D^2*K/6)+f*exp(-b*D*))
+    S(b) = S0((1-f)*exp(-b*D+b^2*D^2*K/6)+f*exp(-b*Db)*delta(c))
 
     Arguments: 
-        b:     vector of b-values [s/mm2]
-        D:     ND array of diffusion coefficients [mm2/s]
-        f:     ND array of perfusion fractions (same shape as D or scalar)
-        Dstar: ND array of perfusion fractions (same shape as D or scalar)
-        S0:    (optional) ND array of signal values at b == 0 (same shape as D or scalar)
-        K:     (optional) ND array of kurtosis coefficients (same shape as D or scalar)
+        b:  vector of b-values [s/mm2]
+        c:  vector of c-values [s/mm]
+        D:  ND array of diffusion coefficients [mm2/s]
+        f:  ND array of perfusion fractions (same shape as D or scalar)
+        S0: (optional) ND array of signal values at b == 0 (same shape as D or scalar)
+        K:  (optional) ND array of kurtosis coefficients (same shape as D or scalar)
 
     Output:
-        J:     Jacobian matrix
+        J:  Jacobian matrix
     """
+    
+    [b, D, f] = at_least_1d([b, D, f])
+    exp2 = monoexp(b,np.atleast_1d(Db))
 
-    [b, D, f, Dstar] = at_least_1d([b, D, f, Dstar])
-    if S0 is not None:
-        [S0] = at_least_1d([S0])
-
-    J_sIVIM = sIVIM_jacobian(b,D,f,S0,K)
-    dSdD  = J_sIVIM[..., 0]
-    dSdDstar = f[..., np.newaxis] * monoexp(b,Dstar) * -(np.ones_like(f)[..., np.newaxis]@b[np.newaxis, :])
-    if S0 is None:
-        dSdf  = J_sIVIM[..., 1] - np.ones_like(f)[..., np.newaxis]@(b==0)[np.newaxis, :] + monoexp(b,Dstar)
+    if K is None:
+        dSdD = (1-f)[..., np.newaxis] * monoexp_jacobian(b,D)[..., 0]
+        dSdf = -monoexp(b,D) + exp2*(c==0)[np.newaxis, :]
     else:
-        dSdf  = J_sIVIM[..., 1] - S0[..., np.newaxis]@(b==0)[np.newaxis, :] + S0[..., np.newaxis]*monoexp(b,Dstar)
-        dSdDstar *= S0[..., np.newaxis]
+        [K] = at_least_1d([K])
+        dSdD = (1-f)[..., np.newaxis] * kurtosis_jacobian(b,D,K)[..., 0]
+        dSdf = -kurtosis(b,D,K) + exp2*(c==0)[np.newaxis, :]
+        dSdK = (1-f)[..., np.newaxis] * kurtosis_jacobian(b,D,K)[..., 1]
 
     if S0 is None:
         if K is None:
-            J_list = [dSdD, dSdf, dSdDstar]
+            J_list = [dSdD, dSdf]
         else:
-            J_list = [dSdD, dSdf, dSdDstar, J_sIVIM[..., 2]]
+            J_list = [dSdD, dSdf, dSdK]
     else:
         [S0] = at_least_1d([S0])
         if K is None:
-            dSdS0 = diffusive(b,D,f,Dstar)
-            J_list = [dSdD, dSdf, dSdDstar, dSdS0]
+            dSdS0 = sBallistic(b, c, D, f)
         else:
-            dSdS0 = diffusive(b,D,f,Dstar,K=K)
-            J_list = [dSdD, dSdf, dSdDstar, dSdS0, J_sIVIM[..., 3]]
+            dSdS0 = sBallistic(b, c, D, f, K=K)
+        dSdD *= S0[..., np.newaxis]
+        dSdf *= S0[..., np.newaxis]
+        if K is None:
+            J_list = [dSdD, dSdf, dSdS0]
+        else:
+            J_list = [dSdD, dSdf, dSdS0, dSdK * S0[..., np.newaxis]]
+
 
     J = np.stack(J_list, axis=-1)
 
@@ -344,5 +416,5 @@ def at_least_1d(pars: list) -> list:
 
 def check_regime(regime: str) -> None:
     """ Check that the regime is valid. """
-    if regime not in [NO_REGIME, DIFFUSIVE_REGIME, BALLISTIC_REGIME, INTERMEDIATE_REGIME]:
-        raise ValueError(f'Invalid regime "{regime}". Valid regimes are "{NO_REGIME}", "{DIFFUSIVE_REGIME}", "{BALLISTIC_REGIME}" and "{INTERMEDIATE_REGIME}".')
+    if regime not in [NO_REGIME, DIFFUSIVE_REGIME, BALLISTIC_REGIME, SBALLISTIC_REGIME, INTERMEDIATE_REGIME]:
+        raise ValueError(f'Invalid regime "{regime}". Valid regimes are "{NO_REGIME}", "{DIFFUSIVE_REGIME}", "{BALLISTIC_REGIME}", "{SBALLISTIC_REGIME}" and "{INTERMEDIATE_REGIME}".')
