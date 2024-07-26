@@ -100,21 +100,23 @@ def cval_from_bval(bval_file: str, Delta: float, delta: float, seq: str = MONOPO
         cval_file = os.path.splitext(bval_file)[0] + '.cval'
     write_cval(cval_file,c)
 
-def calc_interm_pars(bval_file: str, usr_input: dict, seq = MONOPOLAR, cval_file: str = ''):
+def calc_interm_pars(b: npt.NDArray[np.float64], usr_input: dict, seq = MONOPOLAR, c: npt.NDArray[np.float64]=None):
     """
     Calculate parameters for the intermediate regime given other relevant pulse sequence parameters.
 
     Arguments:
-        b:          b-value                [s/mm2]
-        usr_input:  dict with user inputs containing the gradient rise time, maximum gradient strength, 
-        seq:   (optional) pulse sequence (monopolar or bipolar)
+        b:          b-value                 [s/mm2]
+        usr_input:  dict with the gradient rise time, maximum gradient strength and duration of the 180 pulse [s]
+        seq:        (optional) pulse sequence (monopolar or bipolar)
+        c:          (optional) c-values, required for bipolar sequence [s/mm]
 
     Output:
-        G:     gradient strength      [T/mm]
+        Delta:      gradient separation     [s]
+        delta:      gradient duration       [s]
+        k:          +/-1 for non-compensated/flow-compensated
+        T:          encoding time           [s]
     """   
-    b = read_bval(bval_file)
-    if seq == BIPOLAR: 
-        c = read_cval(cval_file)           
+    if seq == BIPOLAR:      
         r = np.roots([4/3, 2*usr_input['t_rise'],0,-max(b)*1e6/(gamma**2*usr_input['Gmax']**2)])
         delta = r[(r.real>=0)*(r.imag == 0)][0].real
         Delta = delta + usr_input['t_rise']
@@ -126,4 +128,4 @@ def calc_interm_pars(bval_file: str, usr_input: dict, seq = MONOPOLAR, cval_file
         Delta = delta + usr_input['t_180']
         k = np.ones_like(b)
         T = np.ones_like(b)*(Delta+delta)
-    return delta, Delta, k, T
+    return Delta*np.ones_like(b), delta*np.ones_like(b), k, T
