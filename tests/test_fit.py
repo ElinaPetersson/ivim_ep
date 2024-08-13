@@ -56,7 +56,7 @@ def test_nlls_sIVIM():
             test_b = b[(b==0) | ((b>=bthr) & (b<1000))]
         write_bval(bval_file, test_b)
 
-        noise(parmap_files['D'], parmap_files['f'], NO_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file)
+        noise(parmap_files['D'], parmap_files['f'], NO_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file)
 
         nlls(im_file, bval_file, NO_REGIME, roi_file = roi_file, outbase = outbase, fitK = fitK)
         for test_par in test_pars:
@@ -74,7 +74,7 @@ def test_nlls_diffusive():
             test_b = b[b<1000]
         write_bval(bval_file, test_b)
 
-        noise(parmap_files['D'], parmap_files['f'], DIFFUSIVE_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file, Dstar_file = parmap_files['Dstar'])
+        noise(parmap_files['D'], parmap_files['f'], DIFFUSIVE_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file, Dstar_file = parmap_files['Dstar'])
 
         nlls(im_file, bval_file, DIFFUSIVE_REGIME, roi_file = roi_file, outbase = outbase, fitK = fitK)
         for test_par in test_pars:
@@ -102,7 +102,7 @@ def test_nlls_ballistic():
             cval_file = bval_file.replace('bval', 'cval')
             write_cval(cval_file, test_c)
 
-            noise(parmap_files['D'], parmap_files['f'], BALLISTIC_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file, vd_file = parmap_files['vd'], cval_file = cval_file)
+            noise(parmap_files['D'], parmap_files['f'], BALLISTIC_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file, vd_file = parmap_files['vd'], cval_file = cval_file)
 
             nlls(im_file, bval_file, BALLISTIC_REGIME, roi_file = roi_file, outbase = outbase, fitK = fitK, cval_file = cval_file)
             for test_par in test_pars:
@@ -121,7 +121,7 @@ def test_seg_sIVIM():
                 test_b = b[(b==0) | ((b>=bthr) & (b<1000))]
             write_bval(bval_file, test_b)
 
-            noise(parmap_files['D'], parmap_files['f'], NO_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file)
+            noise(parmap_files['D'], parmap_files['f'], NO_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file)
             if bthr == b[-1]:
                 np.testing.assert_raises(ValueError, seg, im_file, bval_file, NO_REGIME, bthr = bthr, roi_file = roi_file, outbase = outbase, fitK = fitK)
             else:
@@ -142,7 +142,7 @@ def test_seg_diffusive():
                 test_b = b[b<1000]
             write_bval(bval_file, test_b)
 
-            noise(parmap_files['D'], parmap_files['f'], DIFFUSIVE_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file, Dstar_file = parmap_files['Dstar'])
+            noise(parmap_files['D'], parmap_files['f'], DIFFUSIVE_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file, Dstar_file = parmap_files['Dstar'])
 
             if bthr == b[-1]:
                 np.testing.assert_raises(ValueError, seg, im_file, bval_file, DIFFUSIVE_REGIME, bthr = bthr, roi_file = roi_file, outbase = outbase, fitK = fitK)
@@ -175,7 +175,7 @@ def test_seg_ballistic():
                 cval_file = bval_file.replace('bval', 'cval')
                 write_cval(cval_file, test_c)
 
-                noise(parmap_files['D'], parmap_files['f'], BALLISTIC_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file, vd_file = parmap_files['vd'], cval_file = cval_file)
+                noise(parmap_files['D'], parmap_files['f'], BALLISTIC_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file, vd_file = parmap_files['vd'], cval_file = cval_file)
 
                 if bthr == b[-1]:
                     np.testing.assert_raises(ValueError, seg, im_file, bval_file, BALLISTIC_REGIME, bthr = bthr, cval_file = cval_file, cthr = cthr, roi_file = roi_file, outbase = outbase, fitK = fitK)
@@ -199,7 +199,7 @@ def test_bayes_sIVIM():
                     test_b = b[(b==0) | ((b>=bthr) & (b<1000))]
                 write_bval(bval_file, test_b)
 
-                noise(parmap_files['D'], parmap_files['f'], NO_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file)
+                noise(parmap_files['D'], parmap_files['f'], NO_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file)
 
                 bayes(im_file, bval_file, NO_REGIME, roi_file = roi_file, outbase = outbase, fitK = fitK, n = mcmc_n, ctm = ctm, spatial_prior = spatial_prior)
                 for test_par in test_pars:
@@ -220,7 +220,7 @@ def test_bayes_diffusive():
                         test_b = b[b<1000]
                     write_bval(bval_file, test_b)
 
-                    noise(parmap_files['D'], parmap_files['f'], DIFFUSIVE_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file, Dstar_file = parmap_files['Dstar'])
+                    noise(parmap_files['D'], parmap_files['f'], DIFFUSIVE_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file, Dstar_file = parmap_files['Dstar'])
 
                     bayes(im_file, bval_file, DIFFUSIVE_REGIME, roi_file = roi_file, outbase = outbase, fitK = fitK, n = mcmc_n, ctm = ctm, spatial_prior = spatial_prior, output_std = output_std)
                     for test_par in test_pars:
@@ -253,7 +253,7 @@ def test_bayes_ballistic():
                         cval_file = bval_file.replace('bval', 'cval')
                         write_cval(cval_file, test_c)
 
-                        noise(parmap_files['D'], parmap_files['f'], BALLISTIC_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file, vd_file = parmap_files['vd'], cval_file = cval_file)
+                        noise(parmap_files['D'], parmap_files['f'], BALLISTIC_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file, vd_file = parmap_files['vd'], cval_file = cval_file)
 
                         bayes(im_file, bval_file, BALLISTIC_REGIME, cval_file = cval_file, roi_file = roi_file, outbase = outbase, fitK = fitK, n = mcmc_n, ctm = ctm, spatial_prior = spatial_prior, output_std = output_std)
                         for test_par in test_pars:
@@ -283,7 +283,7 @@ def test_bayes_intermediate():
         seq = BIPOLAR
         K_file = None
 
-        noise(parmap_files['D'], parmap_files['f'], INTERMEDIATE_REGIME, bval_file, 0, outbase, 
+        noise(parmap_files['D'], parmap_files['f'], INTERMEDIATE_REGIME, bval_file, 0, outbase, 1,
             parmap_files['S0'], K_file = K_file, v_file = parmap_files['v'], tau_file=parmap_files['tau'], 
             delta_file=delta_file, Delta_file=Delta_file, T_file=T_file, k_file=k_file, seq=seq)
         
@@ -333,7 +333,7 @@ def test_bayes_intermediate():
                                 k_file = None
                                 T_file = None
                         
-                            noise(parmap_files['D'], parmap_files['f'], INTERMEDIATE_REGIME, bval_file, 0, outbase, parmap_files['S0'], K_file = K_file, v_file = parmap_files['v'], tau_file=parmap_files['tau'], 
+                            noise(parmap_files['D'], parmap_files['f'], INTERMEDIATE_REGIME, bval_file, 0, outbase, 1, parmap_files['S0'], K_file = K_file, v_file = parmap_files['v'], tau_file=parmap_files['tau'], 
                                 delta_file=delta_file, Delta_file=Delta_file, T_file=T_file, k_file=k_file, seq=seq)
 
                             bayes(im_file, bval_file, INTERMEDIATE_REGIME, roi_file = roi_file, outbase = outbase, fitK = fitK, n = mcmc_n, ctm = ctm, spatial_prior = spatial_prior, output_std = output_std,
