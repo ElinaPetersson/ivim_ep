@@ -98,7 +98,7 @@ def noise(D_file: str, f_file: str, regime: str, bval_file: str,
     if Y.ndim > 4:
         raise ValueError('No support for 5D data and above.')
     elif Y.ndim == 4:
-        Y = np.reshape(Y,(1,1,Y.shape[0]*Y.shape[1]*Y.shape[2],Y.shape[3]))
+        Y = np.reshape(Y,(1,Y.shape[0]*Y.shape[1]*Y.shape[2],Y.shape[3]))
     elif Y.ndim == 3:
         Y = Y[np.newaxis, ...]
     elif Y.ndim == 2:

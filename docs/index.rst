@@ -15,7 +15,7 @@ Contents
 .. toctree::
 
    installation
-   examples
+   examples.ipynb
    fit
    models
    sim
