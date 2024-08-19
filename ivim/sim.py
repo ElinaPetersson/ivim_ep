@@ -94,17 +94,18 @@ def noise(D_file: str, f_file: str, regime: str, bval_file: str,
         Y = sBallistic(b, c, D, f, S0, K)
     else:
         Y = sIVIM(b, D, f, S0, K)
-
+    
     if Y.ndim > 4:
         raise ValueError('No support for 5D data and above.')
-    elif Y.ndim == 4:
-        Y = np.reshape(Y,(1,Y.shape[0]*Y.shape[1]*Y.shape[2],Y.shape[3]))
+    elif (Y.ndim == 4) and (n_noise > 1):
+            Y = np.reshape(Y,(1,Y.shape[0]*Y.shape[1],Y.shape[2],Y.shape[3]))
     elif Y.ndim == 3:
         Y = Y[np.newaxis, ...]
     elif Y.ndim == 2:
         Y = Y[ np.newaxis, np.newaxis, ...]
     elif Y.ndim == 1:
         Y = Y[np.newaxis, np.newaxis, np.newaxis, :]
+
 
     rng = np.random.default_rng()
     n1 = rng.normal(0,noise_sigma,(n_noise,)+Y.shape[1:])
