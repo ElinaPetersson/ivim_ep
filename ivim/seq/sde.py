@@ -100,7 +100,7 @@ def cval_from_bval(bval_file: str, Delta: float, delta: float, seq: str = MONOPO
         cval_file = os.path.splitext(bval_file)[0] + '.cval'
     write_cval(cval_file,c)
 
-def calc_interm_pars(b: npt.NDArray[np.float64], usr_input: dict, seq = MONOPOLAR, c: npt.NDArray[np.float64]=None):
+def calc_interm_pars(b: npt.NDArray[np.float64], usr_input: dict, seq = MONOPOLAR, nfc: int = 0):
     """
     Calculate parameters for the intermediate regime given other relevant pulse sequence parameters.
 
@@ -108,11 +108,12 @@ def calc_interm_pars(b: npt.NDArray[np.float64], usr_input: dict, seq = MONOPOLA
         b:          b-value                 [s/mm2]
         usr_input:  dict with the gradient rise time, maximum gradient strength and duration of the 180 pulse [s]
         seq:        (optional) pulse sequence (monopolar or bipolar)
-        c:          (optional) c-values, required for bipolar sequence [s/mm]
-
+        nfc:        (optional) number of flow compensated gradients, required for biopolar sequence
+   
     Output:
         Delta:      gradient separation     [s]
         delta:      gradient duration       [s]
+        c:          c-values                [s/mm]
         k:          +/-1 for non-compensated/flow-compensated
         T:          encoding time           [s]
     """   
@@ -120,12 +121,15 @@ def calc_interm_pars(b: npt.NDArray[np.float64], usr_input: dict, seq = MONOPOLA
         r = np.roots([4/3, 2*usr_input['t_rise'],0,-max(b)*1e6/(gamma**2*usr_input['Gmax']**2)])
         delta = r[(r.real>=0)*(r.imag == 0)][0].real
         Delta = delta + usr_input['t_rise']
+        c = np.zeros_like(b)
+        c[nfc:] = calc_c(G_from_b(b[nfc:], Delta, delta, BIPOLAR), Delta, delta, BIPOLAR)
         k=np.array([int(ci!=0)-int(ci==0) for ci in c])
         T = np.ones_like(b)*(Delta*2+delta*2+usr_input['t_180']+usr_input['t_rise'])
     elif seq == MONOPOLAR:
         r = np.roots([2/3, usr_input['t_180'],0,-max(b)*1e6/(gamma**2*usr_input['Gmax']**2)])
         delta = r[(r.real>=0)*(r.imag == 0)][0].real
         Delta = delta + usr_input['t_180']
+        c = calc_c(G_from_b(b, Delta, delta, MONOPOLAR), Delta, delta, MONOPOLAR)
         k = np.ones_like(b)
         T = np.ones_like(b)*(Delta+delta)
-    return Delta*np.ones_like(b), delta*np.ones_like(b), k, T
+    return Delta*np.ones_like(b), delta*np.ones_like(b), c, k, T

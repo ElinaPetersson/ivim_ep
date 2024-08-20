@@ -112,7 +112,8 @@ def intermediate(b: npt.NDArray[np.float64], delta: npt.NDArray[np.float64], Del
         Delta: vector of gradient separations [s]
         D:     ND array of diffusion coefficients [mm2/s]
         f:     ND array of perfusion fractions (same shape as D or scalar)
-        Dstar: ND array of pseudo-diffusion coefficients [mm2/s] (same shape as D or scalar)
+        v:     ND array of velocities (same shape as D or scalar)
+        tau:   ND array of correlation times [s] (same shape as D or scalar)
         S0:    (optional) ND array of signal values at b == 0 (same shape as D or scalar)
         K:     (optional) ND array of kurtosis coefficients (same shape as D or scalar)
         seq:   (optional) pulse sequence used (monopolar or bipolar)
