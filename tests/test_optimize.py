@@ -1,5 +1,5 @@
 import numpy as np
-from ivim.models import NO_REGIME, DIFFUSIVE_REGIME, BALLISTIC_REGIME
+from ivim.models import NO_REGIME, DIFFUSIVE_REGIME, BALLISTIC_REGIME, SBALLISTIC_REGIME
 from ivim.seq.sde import MONOPOLAR, BIPOLAR
 from ivim.optimize import crlb
 
@@ -24,7 +24,7 @@ def test_crlb_sIVIM():
                 bthr = 200
                 bias_regimes = [DIFFUSIVE_REGIME]
             for bias_regime in bias_regimes:
-                b, a = crlb(D, f, NO_REGIME, bmax = bmax, fitK = fitK, minbias = minbias, bias_regime = bias_regime, K = K, SNR = SNR, 
+                b, a, _ = crlb(D, f, NO_REGIME, bmax = bmax, fitK = fitK, minbias = minbias, bias_regime = bias_regime, K = K, SNR = SNR, 
                         bthr = bthr, Dstar = Dstar, vd = vd,seq=MONOPOLAR,usr_input=usr_input)
                 
                 np.testing.assert_equal(b[0], 0) # First b-value is by design = 0
@@ -38,7 +38,7 @@ def test_crlb_sIVIM():
                 
 def test_crlb_diffusive():
     bmax = 1000
-    b, a = crlb(D, f, DIFFUSIVE_REGIME, bmax = bmax, fitK = False, minbias = False, 
+    b, a, _ = crlb(D, f, DIFFUSIVE_REGIME, bmax = bmax, fitK = False, minbias = False, 
                 bias_regime = DIFFUSIVE_REGIME, K = K, SNR = SNR, Dstar = Dstar,usr_input=usr_input)
     np.testing.assert_almost_equal(np.sum(a), 1.0, 2) # a should sum to one
     np.testing.assert_equal(b.size, 4)
@@ -54,14 +54,32 @@ def test_crlb_ballistic():
             bmax = 1000
         else:
             bmax = 400
-        b, a, fc = crlb(D, f, BALLISTIC_REGIME, bmax = bmax, fitK = False, minbias = False, bias_regime = BALLISTIC_REGIME, K = K, SNR = SNR,
+        b, a, c, _ = crlb(D, f, BALLISTIC_REGIME, bmax = bmax, fitK = False, minbias = False, bias_regime = BALLISTIC_REGIME, K = K, SNR = SNR,
                     Dstar = Dstar, vd = vd, seq=seq, usr_input=usr_input)
         np.testing.assert_almost_equal(np.sum(a), 1.0, 2) # a should sum to one
         np.testing.assert_equal(b.size, 4)
         np.testing.assert_equal(a.size, 4)
-        np.testing.assert_equal(fc.size, 4)
+        np.testing.assert_equal(c.size, 4)
         np.testing.assert_array_less(b, bmax*(1+1e-5))
         np.testing.assert_array_less(0, b + 1e-5)
         np.testing.assert_array_less(a, 1.0)
         np.testing.assert_array_less(0.0, a)
-        np.testing.assert_equal(fc.dtype, bool)
+        np.testing.assert_array_less(0, c + 1e-5)
+
+def test_crlb_sballistic():
+    for seq in [MONOPOLAR, BIPOLAR]:
+        if seq == MONOPOLAR:
+            bmax = 1000
+        else:
+            bmax = 400
+        b, a, c, _ = crlb(D, f, SBALLISTIC_REGIME, bmax = bmax, fitK = False, minbias = False, bias_regime = BALLISTIC_REGIME, K = K, SNR = SNR,
+                        seq=seq, usr_input=usr_input)
+        np.testing.assert_almost_equal(np.sum(a), 1.0, 2) # a should sum to one
+        np.testing.assert_equal(b.size, 4)
+        np.testing.assert_equal(a.size, 4)
+        np.testing.assert_equal(c.size, 4)
+        np.testing.assert_array_less(b, bmax*(1+1e-5))
+        np.testing.assert_array_less(0, b + 1e-5)
+        np.testing.assert_array_less(a, 1.0)
+        np.testing.assert_array_less(0.0, a)
+        np.testing.assert_array_less(0, c + 1e-5)
