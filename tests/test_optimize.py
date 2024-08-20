@@ -75,9 +75,9 @@ def test_crlb_sballistic():
         b, a, c, _ = crlb(D, f, SBALLISTIC_REGIME, bmax = bmax, fitK = False, minbias = False, bias_regime = BALLISTIC_REGIME, K = K, SNR = SNR,
                         seq=seq, usr_input=usr_input)
         np.testing.assert_almost_equal(np.sum(a), 1.0, 2) # a should sum to one
-        np.testing.assert_equal(b.size, 4)
-        np.testing.assert_equal(a.size, 4)
-        np.testing.assert_equal(c.size, 4)
+        np.testing.assert_equal(b.size, 3)
+        np.testing.assert_equal(a.size, 3)
+        np.testing.assert_equal(c.size, 3)
         np.testing.assert_array_less(b, bmax*(1+1e-5))
         np.testing.assert_array_less(0, b + 1e-5)
         np.testing.assert_array_less(a, 1.0)
