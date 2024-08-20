@@ -16,8 +16,8 @@ def crlb(D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], regime: str,
          minbias: bool = False, bias_regime: str = DIFFUSIVE_REGIME, 
          SNR: float = 100, adjustSNR: bool = False,
          bthr: float = 200,
-         Dstar: npt.NDArray[np.float64] | None = None,
-         vd: npt.NDArray[np.float64] | None = None, usr_input: dict | None = None,
+         Dstar: npt.NDArray[np.float64] | None = None, seq: str=MONOPOLAR,
+         vd: npt.NDArray[np.float64] | None = None, usr_input: dict={'Gmax':60e-3,'t_epi': 30e-3,'t_180':10e-3,'t_rise':0.7e-3},
          v: npt.NDArray[np.float64] | None = None, tau: npt.NDArray[np.float64] | None = None):
     """
     Optimize b-values (and possibly c-values) using Cramer-Rao lower bounds optmization.
@@ -34,14 +34,15 @@ def crlb(D: npt.NDArray[np.float64], f: npt.NDArray[np.float64], regime: str,
         K:           (optional) kurtosis coefficients to optimize over if fitK and for bias term if minbias
         SNR:         (optional) expected SNR level at b = 0 to be used to scale the influence of the bias term
         adjust_SNR:  (optional) if True, adjust SNR based on highest b-value and optimize with regards to system limitations
-        usr_input:   
+        usr_input:   (optional) input system requirements, used to compute c-values
     ---- no regime ----
         bthr:        (optional) the smallest non-zero b-value that can be returned by the optimization
     ---- diffusive regime ----
         Dstar:       (optional) pseudodiffusion coefficients for optimization and/or bias term [mm/s]
     ---- ballistic regime ----
         vd:          (optional) velocity dispersion coefficient for optimization and/or bias term [mm/s]
-        usr_input:   (optinoal) dict with maximum gradient strength, epi redout duration, 180 pulse duration and rise time
+        usr_input:   (optional) dict with maximum gradient strength, epi redout duration, 180 pulse duration and rise time
+        seq:         (optional) monopolar or bipolar gradients
     ---- intermediate regime ----
         v:           (optional) velocities (same size as D or scalar)
         tau:         (optional) correlation times [s] (same size as D or scalar)
